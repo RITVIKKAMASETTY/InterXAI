@@ -1,3 +1,4 @@
+import requests
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -72,9 +73,7 @@ def llm(questions, convoid, ques, post, stage="general"):
         return "Unable to evaluate response.", "Sorry, there was an issue processing the response.", "Can we discuss this further?"
 
 def parse_ai_response(response_text):
-    """
-    Parse the AI response text into evaluation, reply, and next question.
-    """
+
     try:
         # Split the response into lines
         lines = response_text.strip().split('\n')
@@ -213,18 +212,11 @@ def chat(request, convoid):
 
 @login_required
 def previous_interviews(request):
-    """
-    Retrieve all previous interviews for the logged-in user.
-    """
     user = request.user  # Get the current logged-in user
-    conversations = conversation.objects.filter(user=user).order_by('-time')  # Fetch user's interviews sorted by time (latest first)
-
+    conversations = conversation.objects.filter(user=user).order_by('-time')
     return render(request, 'bot/previous_interviews.html', {'conversations': conversations})
 @login_required
 def view_conversation(request, convoid):
-    """
-    Display all chats of a specific conversation.
-    """
     convo = get_object_or_404(conversation, id=convoid, user=request.user)  # Ensure the conversation belongs to the logged-in user
     chats = questions.objects.filter(convo=convo).order_by('created_at')  # Fetch all messages for the conversation
 
@@ -305,3 +297,79 @@ def generate_answer(request):
     )
     answer = response.choices[0].message.content.strip()
     return JsonResponse({'answer': answer})
+
+
+def generate_summary(request, convoid):
+    # Get the conversation and related questions
+    convo = get_object_or_404(conversation, id=convoid)
+    questions_list = list(questions.objects.filter(convo=convo).values_list('question', 'answer'))
+    post = convo.post.post
+    # Generate the summary using Groq
+    interview_summary = genreatesummary(questions_list, post)
+
+    # Check if a summary already exists for the conversation
+    sum = summary.objects.filter(convo=convo).first()
+    if sum is None:
+        # If not, create a new summary instance
+        sum = summary(convo=convo)
+
+    # Save the generated summary to the database
+    sum.sum = interview_summary
+    sum.save()
+    return redirect('home')
+
+
+def genreatesummary(questions ,post ):
+    """
+    Function to interact with the Groq API for generating AI responses.
+    """
+    prompt = f"""
+    You are an AI interviewer conducting a professional interview. Your task is to:
+    - To generate the summary of the sequence of question, answer and evaluation given below
+    - Evaluate the entire conversation and generate a constructive feedback on what parameters to improve for the person
+    - The question list i have passed has questions you have asked along with your evaluation, follow up questions and the users response and may not be in any specified order
+
+    Evaluation Criteria:
+    - Clarity of communication
+    - Relevance to the question
+    - Depth of insight
+    - Demonstration of relevant skills/knowledge
+    - Alignment with the job role: {post}
+
+    Your Response Format:
+    Summary: [Provide a Proper summary of the interview and a constructive feedback on what parameters to improve for the person]
+   
+    """
+    try:
+        # Initialize Groq client
+        client = Groq(api_key=key)
+
+        completion = client.chat.completions.create(
+            model="llama3-8b-8192",
+            messages=[{
+                "role": "user",
+                "content": prompt,
+            }],
+            temperature=0.7,  # Balanced temperature for consistent yet creative responses
+            top_p=1,
+        )
+
+        response_text = completion.choices[0].message.content
+        return response_text
+
+    except Exception as e:
+        print(f"Error with Groq API: {e}")
+        return "Unable to evaluate summary.", "Please retry."
+def summ(request, convoid):
+    convo = conversation.objects.filter(id=convoid).first()
+    if convo is None:
+        return redirect('home')
+    sum = summary.objects.filter(convo=convo).first()
+    if sum is None:
+        sum = summary(convo=convo)
+        questions_list = list(questions.objects.filter(convo=convo).values_list('question', 'answer'))
+        post = convo.post.post
+        sum.sum = genreatesummary(questions_list, post)
+        sum.save()
+    summarys = sum.sum
+    return redirect('home')

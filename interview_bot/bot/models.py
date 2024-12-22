@@ -4,6 +4,7 @@ from django.db import models
 
 class posts(models.Model):
     post = models.CharField(max_length=100, default="Default Post Title")
+    content = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return self.post
@@ -16,7 +17,9 @@ class conversation(models.Model):
 
     def __str__(self):
         return f"Conversation ({self.user.username if self.user else 'Unknown User'}, {self.post.post}, {self.time})"
-
+class summary(models.Model):
+    convo = models.ForeignKey(conversation, on_delete=models.CASCADE, db_index=True, default=1)
+    sum = models.TextField()
 
 class questions(models.Model):
     convo = models.ForeignKey(conversation, on_delete=models.CASCADE, db_index=True, default=1)
