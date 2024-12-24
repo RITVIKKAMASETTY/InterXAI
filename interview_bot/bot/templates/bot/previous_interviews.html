@@ -65,6 +65,7 @@
                         <strong>Post:</strong> {{ convo.post.post }} <br>
                         <strong>Date:</strong> {{ convo.time|date:"D, d M Y H:i" }} <br>
                         <a href="{% url 'view_conversation' convoid=convo.id %}">View Conversation</a>
+                        <a href="{% url 'summary' convoid=convo.id %}">Generate the summary</a>
                     </li>
                 {% endfor %}
             </ul>
