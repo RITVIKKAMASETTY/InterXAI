@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Multi-Room Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            margin: 0;
+            padding: 0;
+        }
+        #main-container {
+            max-width: 1200px;
+            margin: 50px auto;
+            display: flex;
+            gap: 20px;
+        }
+        #rooms-sidebar {
+            width: 250px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            padding: 20px;
+        }
+        .room-item {
+            padding: 10px;
+            margin: 5px 0;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .room-item:hover {
+            background-color: #f0f0f0;
+        }
+        .room-item.active {
+            background-color: #007bff;
+            color: white;
+        }
+        #chat-container {
+            flex-grow: 1;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        .chat-area {
+            display: none;
+            height: 100%;
+        }
+        .chat-area.active {
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-log {
+            height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            border-bottom: 1px solid #ccc;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* New message styling */
+        .message-container {
+            display: flex;
+            flex-direction: column;
+            margin: 5px 0;
+            max-width: 70%;
+        }
+
+        .message-container.sent {
+            align-self: flex-end;
+        }
+
+        .message-container.received {
+            align-self: flex-start;
+        }
+
+        .message-bubble {
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin-top: 5px;
+            word-wrap: break-word;
+        }
+
+        .sent .message-bubble {
+            background-color: #007bff;
+            color: white;
+        }
+
+        .received .message-bubble {
+            background-color: #e9ecef;
+            color: black;
+        }
+
+        .message-container .username {
+            font-size: 0.8em;
+            margin-bottom: 2px;
+            color: #666;
+        }
+
+        .sent .username {
+            text-align: right;
+        }
+
+        .chat-form {
+            display: flex;
+            padding: 10px;
+            background: #f9f9f9;
+        }
+        .chat-message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .chat-message-submit {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .chat-message-submit:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg bg-body-tertiary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="index.html">SafeHaven</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+            </div>
+            <a href="{% url 'previous_interviews' %}"> <button class="btn-primary-custom">Previous Interviews</button></a>
+            <a href="{% url 'interview_simulator' %}"> <button class="btn-primary-custom">Simple Interview</button> </a>
+            <a href="{% url 'gc' %}"> <button class="btn-primary-custom">Chat</button> </a>
+            <a href="{% url 'logout' %}"> <button class="btn-primary-custom">Logout</button> </a>
+        </div>
+    </nav>
+
+    <div id="main-container">
+        <div id="rooms-sidebar">
+            <h4>Chat Rooms</h4>
+            {% for room in rooms %}
+            <div class="room-item" data-room="{{ room.roomName }}">
+                {{ room.roomName }}
+            </div>
+            {% endfor %}
+        </div>
+
+        <div id="chat-container">
+            {% for room in rooms %}
+            <div class="chat-area" data-room="{{ room.roomName }}">
+                <div class="chat-log">
+                    {% for message in messages %}
+                        {% if message.group.roomName == room.roomName %}
+                        <div class="message-container {% if message.user.username == request.user.username %}sent{% else %}received{% endif %}">
+                            <div class="username">{{ message.user.username }}</div>
+                            <div class="message-bubble">
+                                {{ message.message }}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                <form class="chat-form">
+                    <input class="chat-message-input" type="text" placeholder="Type your message here..." autocomplete="off">
+                    <button class="chat-message-submit" type="button">Send</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script>
+        class ChatRoom {
+            constructor(roomName) {
+                this.roomName = roomName;
+                this.socket = new WebSocket(`ws://${window.location.host}/ws/chat/${encodeURIComponent(roomName)}/`);
+                this.chatArea = document.querySelector(`.chat-area[data-room="${roomName}"]`);
+                this.chatLog = this.chatArea.querySelector('.chat-log');
+                this.messageInput = this.chatArea.querySelector('.chat-message-input');
+                this.messageSubmit = this.chatArea.querySelector('.chat-message-submit');
+
+                this.initializeEventListeners();
+            }
+
+            initializeEventListeners() {
+                this.socket.onmessage = (e) => {
+                    const data = JSON.parse(e.data);
+                    const messageContainer = document.createElement("div");
+                    const isCurrentUser = data.user === "{{ request.user.username }}";
+                    messageContainer.className = `message-container ${isCurrentUser ? 'sent' : 'received'}`;
+
+                    messageContainer.innerHTML = `
+                        <div class="username">${data.user}</div>
+                        <div class="message-bubble">${data.message}</div>
+                    `;
+
+                    this.chatLog.appendChild(messageContainer);
+                    this.chatLog.scrollTop = this.chatLog.scrollHeight;
+                };
+
+                this.socket.onclose = () => {
+                    console.error(`Chat socket closed for room ${this.roomName}`);
+                };
+
+                this.messageSubmit.addEventListener("click", () => this.sendMessage());
+                this.messageInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+            }
+
+            sendMessage() {
+                const message = this.messageInput.value.trim();
+                if (message) {
+                    this.socket.send(JSON.stringify({
+                        message: message,
+                        room: this.roomName
+                    }));
+                    this.messageInput.value = "";
+                }
+            }
+
+            activate() {
+                this.chatArea.classList.add('active');
+            }
+
+            deactivate() {
+                this.chatArea.classList.remove('active');
+            }
+        }
+
+        // Initialize chat rooms
+        const chatRooms = {};
+        document.querySelectorAll('.room-item').forEach(roomElement => {
+            const roomName = roomElement.dataset.room;
+            chatRooms[roomName] = new ChatRoom(roomName);
+
+            roomElement.addEventListener('click', () => {
+                // Update active states
+                document.querySelectorAll('.room-item').forEach(el => el.classList.remove('active'));
+                roomElement.classList.add('active');
+
+                // Switch chat room display
+                Object.values(chatRooms).forEach(room => room.deactivate());
+                chatRooms[roomName].activate();
+            });
+        });
+
+        // Activate first room by default
+        const firstRoomName = document.querySelector('.room-item').dataset.room;
+        document.querySelector('.room-item').classList.add('active');
+        chatRooms[firstRoomName].activate();
+    </script>
+</body>
+</html>

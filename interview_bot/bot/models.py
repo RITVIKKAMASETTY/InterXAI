@@ -30,12 +30,15 @@ class questions(models.Model):
     def __str__(self):
         return f"Question ({self.user}, {self.created_at})"
 
-class VerificationCode(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
-    code = models.CharField(max_length=6)
-    created_at = models.DateTimeField(auto_now_add=True)
-    is_used = models.BooleanField(default=False)
+class chatGroup(models.Model):
+    roomName= models.CharField(max_length=30)
+    def __str__(self):
+        return self.roomName
 
-    def is_expired(self):
-        time_elapsed = timezone.now() - self.created_at
-        return time_elapsed.total_seconds() > 30
+class Messages(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    message = models.TextField()
+    createdAt = models.DateTimeField(auto_now_add=True)
+    group = models.ForeignKey(chatGroup, on_delete=models.CASCADE)
+    def __str__(self):
+        return f"{self.user} - {self.group}"

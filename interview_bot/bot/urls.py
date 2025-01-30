@@ -22,4 +22,5 @@ urlpatterns = [
     path('verify-email/', views.verify_email, name='verify_email'),
     path('resend-code/', views.resend_code, name='resend_code'),
     path('logout/', views.logoutView, name='logout'),
+    path('gc/', views.public_chat,name='gc'),
 ]

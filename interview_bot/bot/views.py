@@ -497,3 +497,14 @@ def summ(request, convoid):
 def logoutView(request):
     logout(request)
     return redirect('login')
+
+@login_required
+def public_chat(request):
+
+    rooms = chatGroup.objects.all()
+    messages = Messages.objects.all().order_by('createdAt')
+
+    return render(request, 'bot/gc.html', {
+        'messages': messages,
+        'rooms': rooms,  # Pass the list of usernames
+    })

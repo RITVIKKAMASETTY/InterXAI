@@ -31,6 +31,8 @@ SITE_ID=2
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -88,7 +90,14 @@ TEMPLATES = [
 
 # WSGI_APPLICATION = 'interview_bot.wsgi.application'
 ASGI_APPLICATION = 'interview_bot.asgi.application'
-
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [("localhost", 6380)],
+        },
+    },
+}
 ALLOWED_HOSTS = []
 # CELERY_BROKER_URL = "redis://localhost:6380"
 # CELERY_RESULT_BACKEND = "redis://localhost:6380"
