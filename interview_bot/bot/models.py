@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from django.db import models
-
+from django.utils import timezone
 
 class posts(models.Model):
     post = models.CharField(max_length=100, default="Default Post Title")
@@ -30,3 +30,12 @@ class questions(models.Model):
     def __str__(self):
         return f"Question ({self.user}, {self.created_at})"
 
+class VerificationCode(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_used = models.BooleanField(default=False)
+
+    def is_expired(self):
+        time_elapsed = timezone.now() - self.created_at
+        return time_elapsed.total_seconds() > 30

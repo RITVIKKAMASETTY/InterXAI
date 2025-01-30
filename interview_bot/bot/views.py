@@ -1,14 +1,17 @@
 import requests
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.csrf import csrf_protect, csrf_exempt
 from groq import Groq
 from .models import *
-from .forms import CustomAuthenticationForm, CustomUserCreationForm
+from .forms import CustomAuthenticationForm, CustomUserCreationForm, EmailVerificationForm
 import json
 from django.http import JsonResponse
+from django.contrib import messages
+
+from .utils import generate_verification_code, send_verification_email
 
 key = "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"
 
@@ -105,15 +108,132 @@ def parse_ai_response(response_text):
         print(f"Error parsing AI response: {e}")
         return "Error in evaluation.", "Error processing response.", "Could you provide more details?"
 
+
+# views.py
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth import login
+from django.http import JsonResponse
+from django.utils import timezone
+import json
+import random
+import string
+from django.core.mail import send_mail
+from django.conf import settings
+
+
+def generate_verification_code():
+    return ''.join(random.choices(string.digits, k=6))
+
+
+def send_verification_email(email, code):
+    subject = 'Your Verification Code'
+    message = f'Your verification code is: {code}\nThis code will expire in 30 seconds.'
+    from_email = settings.EMAIL_HOST_USER
+    recipient_list = [email]
+
+    send_mail(subject, message, from_email, recipient_list)
+
+
 def register(request):
-    form = CustomUserCreationForm()
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('login')
+            # Store form data in session
+            user_data = {
+                'username': form.cleaned_data['username'],
+                'email': form.cleaned_data['email'],
+                'password': form.cleaned_data['password1'],
+            }
+            request.session['pending_user'] = user_data
+
+            # Generate and store verification code in session
+            code = generate_verification_code()
+            request.session['verification_code'] = code
+            request.session['code_generated_at'] = timezone.now().timestamp()
+
+            # Send verification email
+            send_verification_email(user_data['email'], code)
+
+            return redirect('verify_email')
+    else:
+        form = CustomUserCreationForm()
     return render(request, 'bot/register.html', {'form': form})
 
+
+def verify_email(request):
+    # Check if we have pending registration
+    pending_user = request.session.get('pending_user')
+    if not pending_user:
+        return redirect('reg')
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            submitted_code = data.get('verification_code')
+            stored_code = request.session.get('verification_code')
+            code_generated_at = request.session.get('code_generated_at')
+
+            # Check if code is expired (30 seconds)
+            current_time = timezone.now().timestamp()
+            is_expired = (current_time - code_generated_at) > 30
+
+            if stored_code and submitted_code == stored_code and not is_expired:
+                # Create the user
+                user = User.objects.create_user(
+                    username=pending_user['username'],
+                    email=pending_user['email'],
+                    password=pending_user['password']
+                )
+
+                # Clean up session
+                for key in ['pending_user', 'verification_code', 'code_generated_at']:
+                    if key in request.session:
+                        del request.session[key]
+
+                # Authenticate and login the user
+                authenticated_user = authenticate(
+                    request,
+                    username=pending_user['username'],
+                    password=pending_user['password']
+                )
+
+                if authenticated_user is not None:
+                    login(request, authenticated_user, backend='django.contrib.auth.backends.ModelBackend')
+                    return JsonResponse({'success': True})
+                else:
+                    return JsonResponse({'success': False, 'error': 'Authentication failed'})
+            else:
+                error = 'Code expired' if is_expired else 'Invalid code'
+                return JsonResponse({'success': False, 'error': error})
+
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid request'})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return render(request, 'bot/verify_email.html')
+
+def resend_code(request):
+    if request.method == 'POST':
+        pending_user = request.session.get('pending_user')
+        if not pending_user:
+            return JsonResponse({'success': False, 'error': 'No pending registration'})
+
+        try:
+            # Generate new code
+            code = generate_verification_code()
+            del request.session['verification_code']
+            del request.session['code_generated_at']
+            request.session['verification_code'] = code
+            request.session['code_generated_at'] = timezone.now().timestamp()
+            send_verification_email(pending_user['email'], code)
+            return JsonResponse({'success': True})
+
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 def login_view(request):
     if request.method == 'POST':
         form = CustomAuthenticationForm(request, data=request.POST)
@@ -373,3 +493,7 @@ def summ(request, convoid):
         sum.save()
     summarys = sum.sum
     return redirect('home')
+
+def logoutView(request):
+    logout(request)
+    return redirect('login')

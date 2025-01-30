@@ -19,4 +19,7 @@ urlpatterns = [
     path('generate_answer/', views.generate_answer, name='generate_answer'),
     path('end-conve/<str:convoid>',views.generate_summary,name='end-convo'),
     path('summary/<str:convoid>',views.summ,name='summary'),
+    path('verify-email/', views.verify_email, name='verify_email'),
+    path('resend-code/', views.resend_code, name='resend_code'),
+    path('logout/', views.logoutView, name='logout'),
 ]

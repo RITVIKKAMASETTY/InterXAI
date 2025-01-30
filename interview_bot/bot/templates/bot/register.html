@@ -112,7 +112,15 @@
                     </div>
                 {% endif %}
             </div>
-
+            <div class="form-group">
+                {{ form.email }}
+                <label class="form-label mt-2" for="email">email</label>
+                {% if form.email.errors %}
+                    <div class="text-danger">
+                        {{ form.email.errors }}
+                    </div>
+                {% endif %}
+            </div>
             <div class="form-group">
                 {{ form.password1 }}
                 <label class="form-label mt-2" for="id_password1">Password</label>
@@ -132,9 +140,7 @@
                     </div>
                 {% endif %}
             </div>
-        <!--   <a href="{% provider_login_url 'google' %}?next=/home"> <button class="btn btn-primary" type="button">
-                continue with google
-            </button></a> -->
+
             <button class="btn btn-primary" type="submit">
                 Create account
             </button>

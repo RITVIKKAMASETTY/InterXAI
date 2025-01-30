@@ -173,3 +173,17 @@ AUTHENTICATION_BACKENDS = {
 }
 LOGIN_REDIRECT_URL="/"
 LOGOUT_REDIRECT_URL="/"
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'  # or your email provider
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'tester7760775061@gmail.com'
+EMAIL_HOST_PASSWORD = 'mamb mymj uuus gcbh'
+
+CELERY_BROKER_URL = "redis://127.0.0.1:6380"
+CELERY_RESULT_BACKEND = "redis://127.0.0.1:6380"
+CELERY_ACCEPT_CONTENT = ['application/json']
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TASK_SELERLIZER = 'json'
+CELERY_RESULT_EXPIRES = 60 * 60 * 24
+broker_connection_retry_on_startup = True
