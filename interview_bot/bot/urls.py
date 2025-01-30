@@ -6,9 +6,9 @@ from . import views
 
 urlpatterns = [
 
-    path('', views.register,name= 'reg'),
+    path('reg', views.register,name= 'reg'),
     path('login', views.login_view,name='login'),
-    path('home', views.home_view,name='home'),
+    path('', views.home_view,name='home'),
     path('chat_create-<int:post>', views.chatcreate,name='chatcreate'),
     path('chat-<str:convoid>/',views.chat,name='chat'),
     path('previous_interviews/', views.previous_interviews, name='previous_interviews'),

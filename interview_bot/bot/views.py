@@ -130,7 +130,7 @@ def login_view(request):
 
     return render(request, 'bot/login.html', {'form': form})
 
-@login_required
+@login_required(login_url='reg')
 def home_view(request):
     post = posts.objects.all()
     return render(request, 'bot/home.html', {'post': post})
