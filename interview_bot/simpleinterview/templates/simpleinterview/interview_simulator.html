@@ -99,7 +99,7 @@ button:hover {
                     return;
                 }
 
-                $.get("/generate_question/", { role: role }, function (data) {
+                $.get("/interview_simulator/generate_question/", { role: role }, function (data) {
                     $("#role-section").hide();
                     $("#question-section").show();
                     $("#question").text(data.question);
@@ -110,7 +110,7 @@ button:hover {
                 const question = $("#question").text();
                 if (!question) return;
 
-                $.get("/generate_hint/", { question: question }, function (data) {
+                $.get("/interview_simulator/generate_hint/", { question: question }, function (data) {
                     $("#hint-text").text("Hint: " + data.hint);
                     score -= 5;
                     $("#score").text(score);
@@ -126,7 +126,7 @@ button:hover {
                     return;
                 }
 
-                $.get("/generate_answer/", { question: question }, function (data) {
+                $.get("/interview_simulator/generate_answer/", { question: question }, function (data) {
                     const correctAnswer = data.answer;
 
                     if (userAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
@@ -140,7 +140,7 @@ button:hover {
                     $("#score").text(score);
 
                     // Generate next question
-                    $.get("/generate_question/", { role: $("#role").val() }, function (data) {
+                    $.get("/interview_simulator/generate_question/", { role: $("#role").val() }, function (data) {
                         $("#question").text(data.question);
                         $("#answer").val('');
                         $("#hint-text").text('');

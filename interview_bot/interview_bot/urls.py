@@ -22,8 +22,11 @@ from django.urls import path, include
 urlpatterns = [
     # Your other URL patterns
     path('admin/', admin.site.urls),
-    path('', include('bot.urls')),
-    path("accounts/", include("allauth.urls"))# Include app-specific URLs
+    path('reg/', include('users.urls')),
+    path('',include('bot.urls')),
+    path('gc/',include('groupchat.urls')),
+    path("accounts/", include("allauth.urls")),
+    path('interview_simulator/',include('simpleinterview.urls')),
 ]
 
 # Serve media files during development
