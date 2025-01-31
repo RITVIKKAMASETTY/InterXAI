@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.3.1/dist/css/bootstrap.min.css">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            overflow: hidden;
+            background-color: #f8f9fa;
+        }
+        .spline-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: -1;
+        }
+        .card {
+            z-index: 1;
+            margin-top: 50px;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .form-control {
+            border-radius: 30px;
+            height: 45px;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+        .btn {
+            border-radius: 30px;
+            height: 45px;
+            font-size: 16px;
+            transition: all 0.3s ease-in-out;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #00c6ff, #0072ff);
+            border: none;
+        }
+        .btn-secondary {
+            background: linear-gradient(90deg, #6c757d, #495057);
+            border: none;
+        }
+        .timer {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 10px;
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+        #resendButton {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="spline-container">
+        <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.48/build/spline-viewer.js"></script>
+        <spline-viewer url="https://prod.spline.design/Ic5bA74ogv-eXzmF/scene.splinecode"></spline-viewer>
+    </div>
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card p-4">
+                    <h3 class="text-center mb-4">Email Verification</h3>
+
+                    <div id="alertContainer"></div>
+
+                    <form id="verificationForm">
+                        {% csrf_token %}
+                        <div class="form-outline mb-4">
+                            <input type="text"
+                                   id="verification_code"
+                                   name="verification_code"
+                                   class="form-control"
+                                   placeholder="Enter 6-digit code"
+                                   maxlength="6"
+                                   pattern="\d{6}"
+                                   required>
+                            <label class="form-label">Verification Code</label>
+                            <div class="error-message" id="codeError"></div>
+                        </div>
+
+                        <div class="text-center mb-3">
+                            <button class="btn btn-primary btn-block" type="submit" id="verifyButton">
+                                Verify Code
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="text-center">
+                        <div class="timer mb-3">
+                            Code expires in: <span id="timer">30</span> seconds
+                        </div>
+                        <button id="resendButton" class="btn btn-secondary" style="display: none;">
+                            Resend Code
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let timerInterval;
+            const timerDisplay = document.getElementById('timer');
+            const resendButton = document.getElementById('resendButton');
+            const verificationForm = document.getElementById('verificationForm');
+            const alertContainer = document.getElementById('alertContainer');
+
+            // Get CSRF token from cookie
+            function getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+
+            function startTimer(duration) {
+                let timer = duration;
+                clearInterval(timerInterval);
+
+                timerInterval = setInterval(function () {
+                    timerDisplay.textContent = timer;
+
+                    if (--timer < 0) {
+                        clearInterval(timerInterval);
+                        timerDisplay.textContent = "Expired";
+                        resendButton.style.display = 'inline-block';
+                    }
+                }, 1000);
+            }
+
+            function showAlert(message, type) {
+                alertContainer.innerHTML = `
+                    <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                        ${message}
+                        <button type="button" class="close" data-dismiss="alert">
+                            <span>&times;</span>
+                        </button>
+                    </div>
+                `;
+            }
+
+            // Start initial timer
+            startTimer(30);
+
+            // Handle verification form submission
+            verificationForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const code = document.getElementById('verification_code').value;
+                const csrftoken = getCookie('csrftoken');
+
+                fetch('{% url "verify_reset_code" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken,
+                    },
+                    credentials: 'same-origin',  // Required for cookies to be sent
+                    body: JSON.stringify({ verification_code: code })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('Verification successful! Redirecting...', 'success');
+                        setTimeout(() => {
+                            window.location.href = '{% url "reset_password" %}';
+                        }, 1500);
+                    } else {
+                        document.getElementById('codeError').textContent = data.error;
+                        document.getElementById('codeError').style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    showAlert('An error occurred. Please try again.', 'danger');
+                });
+            });
+
+            // Handle resend button click
+            resendButton.addEventListener('click', function() {
+                const csrftoken = getCookie('csrftoken');
+
+                fetch('{% url "resend_reset_code" %}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrftoken,
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showAlert('New code sent! Check your email.', 'success');
+                        resendButton.style.display = 'none';
+                        startTimer(30);
+                        document.getElementById('verification_code').value = '';
+                        document.getElementById('codeError').style.display = 'none';
+                    } else {
+                        showAlert('Failed to send new code. Please try again.', 'danger');
+                    }
+                })
+                .catch(error => {
+                    showAlert('An error occurred. Please try again.', 'danger');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

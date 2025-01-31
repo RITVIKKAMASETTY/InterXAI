@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 import json
 from .utils import *
+from django.contrib import messages
 
 
 
@@ -86,7 +87,7 @@ def verify_email(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
 
-    return render(request, 'bot/verify_email.html')
+    return render(request, 'users/verify_email.html')
 
 def resend_code(request):
     if request.method == 'POST':
@@ -127,3 +128,111 @@ def login_view(request):
 def logoutView(request):
     logout(request)
     return redirect('login')
+
+def forgot_password(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+
+        try:
+            email = User.objects.get(username=username).email
+            reset_code = generate_verification_code()
+            request.session['reset_code'] = reset_code
+            request.session['reset_email'] = email
+            request.session['username'] = username
+            request.session['code_generated_at'] = timezone.now().timestamp()
+
+            # Send reset code email
+            send_reset_code_email(email, reset_code)
+
+            return redirect('verify_reset_code')
+
+        except User.DoesNotExist:
+            messages.error(request, 'No account found with this username.')
+
+    return render(request, 'users/forgot_password.html')
+
+
+def verify_reset_code(request):
+    reset_email = request.session.get('reset_email')
+    if not reset_email:
+        return redirect('forgot_password')
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            submitted_code = data.get('verification_code')
+            stored_code = request.session.get('reset_code')
+            code_generated_at = request.session.get('code_generated_at')
+
+            # Check if code is expired (30 seconds)
+            current_time = timezone.now().timestamp()
+            is_expired = (current_time - code_generated_at) > 30
+
+            if stored_code and submitted_code == stored_code and not is_expired:
+                request.session['reset_verified'] = True
+                return JsonResponse({'success': True})
+            else:
+                error = 'Code expired' if is_expired else 'Invalid code'
+                return JsonResponse({'success': False, 'error': error})
+
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+    return render(request, 'users/verify_reset_code.html')
+
+
+def resend_reset_code(request):
+    if request.method == 'POST':
+        reset_email = request.session.get('reset_email')
+        if not reset_email:
+            return JsonResponse({'success': False, 'error': 'No pending reset request'})
+
+        try:
+            # Generate new code
+            reset_code = generate_reset_code()
+            request.session['reset_code'] = reset_code
+            request.session['code_generated_at'] = timezone.now().timestamp()
+
+            # Send new code
+            send_reset_code_email(reset_email, reset_code)
+            return JsonResponse({'success': True})
+
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)})
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+def reset_password(request):
+    if not request.session.get('reset_verified'):
+        return redirect('forgot_password')
+
+    if request.method == 'POST':
+        password1 = request.POST.get('password1')
+        password2 = request.POST.get('password2')
+
+        if password1 != password2:
+            messages.error(request, 'Passwords do not match.')
+            return render(request, 'users/reset_password.html')
+
+        if len(password1) < 8:
+            messages.error(request, 'Password must be at least 8 characters long.')
+            return render(request, 'users/reset_password.html')
+
+        try:
+            user = User.objects.get(username=request.session['username'])
+            user.set_password(password1)
+            user.save()
+
+            # Clean up session
+            for key in ['reset_email', 'reset_code', 'code_generated_at', 'reset_verified']:
+                if key in request.session:
+                    del request.session[key]
+
+            messages.success(request, 'Password reset successful! Please login with your new password.')
+            return redirect('login')
+
+        except User.DoesNotExist:
+            messages.error(request, 'An error occurred. Please try again.')
+
+    return render(request, 'users/reset_password.html')
