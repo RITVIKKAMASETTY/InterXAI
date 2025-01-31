@@ -186,7 +186,7 @@
                     if (data.success) {
                         showAlert('Verification successful! Redirecting...', 'success');
                         setTimeout(() => {
-                            window.location.href = '{% url "login" %}';
+                            window.location.href = '{% url "home" %}';
                         }, 1500);
                     } else {
                         document.getElementById('codeError').textContent = data.error;
